@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: my_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123  # 设置 MySQL 的 root 密码
+      MYSQL_DATABASE: my_gin_db             # 启动时自动建好这个空库
+    ports:
+      - "3306:3306"
+    # 将数据挂载到本地，防止容器重启后数据丢失
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # 2. 我们的 Go 业务服务
+  app:
+    build: .             # 告诉 compose 去当前目录找 Dockerfile 现场编译
+    container_name: my_go_app
+    ports:
+      - "8080:8080"
+    environment:
+      # 【核心魔法】：注意这里的 tcp(mysql:3306)！
+      # 在 Docker 内部网络里，容器之间可以直接通过服务名（mysql）互相访问，不需要写 IP！
+      - DSN=root:rootpassword123@tcp(mysql:3306)/my_gin_db?charset=utf8mb4&parseTime=True&loc=Local
+    depends_on:
+      - mysql            # 确保 mysql 先启动
+    restart: always      # 如果数据库没准备好导致程序崩溃，它会自动重启重试
+
+volumes:
+  mysql_data:

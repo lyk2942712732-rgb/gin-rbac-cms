@@ -1,0 +1,11 @@
+# 编译出来的二进制文件
+myapp
+myapp.exe
+*.exe
+
+# 环境变量文件 (保护你的密码)
+.env
+
+# Go 依赖和缓存
+vendor/
+/go.build
