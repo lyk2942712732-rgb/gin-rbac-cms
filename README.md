@@ -41,7 +41,7 @@
 得益于容器化方案，您无需在本地安装 MySQL 和 Go 环境，仅需安装 Docker 即可一键启动整个微服务。
 
 # 1. 克隆项目
-git clone [https://github.com/](https://github.com/)lyk2942712732-rgb/gin-rbac-cms.git
+git clone https://github.com/lyk2942712732-rgb/gin-rbac-cms.git
 cd gin-rbac-cms
 
 # 2. 一键编译并启动 (包含 MySQL 数据库与 Gin 服务)
