@@ -138,15 +138,6 @@ func DeleteArticle(c *gin.Context) {
 		return
 	}
 
-	// 验证当前用户是否是文章的作者
-	if uid, exists := c.Get("userID"); exists {
-		var userID = uid.(uint)
-		if article.UserID != userID && userID != 1 { // 允许管理员（假设 ID=1）删除任何文章
-			c.JSON(http.StatusForbidden, gin.H{"code": 403, "msg": "无权删除此文章"})
-			return
-		}
-	}
-
 	//权限检查通过后删除文章
 	if err := models.DB.Delete(&models.Article{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "删除失败"})
