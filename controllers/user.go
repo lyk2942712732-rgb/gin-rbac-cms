@@ -10,13 +10,27 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// c *gin.Context 是 Gin 框架中用于处理 HTTP 请求和响应的上下文对象，包含了请求的所有信息以及用于构建响应的方法。
+type RegisterRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// Register 账号注册
+// @Summary 用户注册
+// @Description 接收前端传来的账号密码，使用 Bcrypt 加密后存入数据库
+// @Tags 用户模块
+// @Accept json
+// @Produce json
+// @Param data body RegisterRequest true "注册信息"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/register [post]
 func Register(c *gin.Context) {
-	var input struct {
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
-		//结构体标签，告诉 Gin 这个字段是必填的，并且当结构体与json绑定时，会将 JSON 数据绑定到这个字段。
-	}
+	var input RegisterRequest
 	// ShouldBindJSON 方法会将请求体中的 JSON 数据绑定到 input 结构体中，如果绑定失败，它会返回一个错误。
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -43,11 +57,17 @@ func Register(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "注册成功"})
 }
 
+// Login 账号登录
+// @Summary 用户登录
+// @Description 验证账号密码，成功后返回 JWT Token
+// @Tags 用户模块
+// @Accept json
+// @Produce json
+// @Param data body LoginRequest true "登录信息"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/login [post]
 func Login(c *gin.Context) {
-	var input struct {
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
-	}
+	var input LoginRequest
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
@@ -77,6 +97,15 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
+// GetProfile 获取当前登录用户信息
+// @Summary 获取当前登录用户信息
+// @Description 获取当前登录用户的基础资料
+// @Tags 用户模块
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/profile [get]
 func GetProfile(c *gin.Context) {
 	userID, _ := c.Get("userID")
 

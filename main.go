@@ -8,6 +8,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// @title Gin-RBAC-CMS 接口文档
+// @version 1.0
+// @description 这是一个基于 Gin 和 RBAC 的企业级内容管理系统 API
+// @host localhost:8080
+// @BasePath /
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
 	// 1. 初始化数据库
 	models.InitDB()

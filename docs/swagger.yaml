@@ -1,0 +1,247 @@
+basePath: /
+definitions:
+  controllers.CreateArticleRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+    required:
+    - content
+    - title
+    type: object
+  controllers.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  controllers.RegisterRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  controllers.UpdateArticleRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: 这是一个基于 Gin 和 RBAC 的企业级内容管理系统 API
+  title: Gin-RBAC-CMS 接口文档
+  version: "1.0"
+paths:
+  /api/articles:
+    get:
+      consumes:
+      - application/json
+      description: 分页获取系统的文章数据，支持标题模糊搜索
+      parameters:
+      - description: 页码，默认1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认10
+        in: query
+        name: size
+        type: integer
+      - description: 文章标题
+        in: query
+        name: title
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: 分页获取文章
+      tags:
+      - 文章模块
+    post:
+      consumes:
+      - application/json
+      description: 当前登录用户发布一篇新文章
+      parameters:
+      - description: 文章内容
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.CreateArticleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: 发布新文章
+      tags:
+      - 文章模块
+  /api/articles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 根据文章 ID 删除文章，需具备 article:delete 权限
+      parameters:
+      - description: 文章ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: 删除文章
+      tags:
+      - 文章模块
+    get:
+      consumes:
+      - application/json
+      description: 根据文章 ID 获取文章详情和作者信息
+      parameters:
+      - description: 文章ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: 获取文章详情
+      tags:
+      - 文章模块
+    put:
+      consumes:
+      - application/json
+      description: 根据文章 ID 更新文章标题和内容
+      parameters:
+      - description: 文章ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新内容
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UpdateArticleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: 更新文章
+      tags:
+      - 文章模块
+  /api/login:
+    post:
+      consumes:
+      - application/json
+      description: 验证账号密码，成功后返回 JWT Token
+      parameters:
+      - description: 登录信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 用户登录
+      tags:
+      - 用户模块
+  /api/profile:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前登录用户的基础资料
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: 获取当前登录用户信息
+      tags:
+      - 用户模块
+  /api/register:
+    post:
+      consumes:
+      - application/json
+      description: 接收前端传来的账号密码，使用 Bcrypt 加密后存入数据库
+      parameters:
+      - description: 注册信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 用户注册
+      tags:
+      - 用户模块
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
