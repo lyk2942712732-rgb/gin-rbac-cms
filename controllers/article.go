@@ -107,15 +107,6 @@ func UpdateArticle(c *gin.Context) {
 		return
 	}
 
-	// 验证当前用户是否是文章的作者或管理员（假设管理员 ID=1）
-	if uid, exists := c.Get("userID"); exists {
-		var userID = uid.(uint)
-		if article.UserID != userID && userID != 1 {
-			c.JSON(http.StatusForbidden, gin.H{"code": 403, "msg": "无权修改此文章"})
-			return
-		}
-	}
-
 	//权限检查通过后修改文章信息
 	article.Title = input.Title
 	article.Content = input.Content
