@@ -11,7 +11,7 @@ import (
 // RDB 是全局的 Redis 客户端
 var RDB *redis.Client
 
-// Ctx 是 Redis 操作必须的上下文
+// Ctx 是 Redis 操作必须的上下文,是操作许可
 var Ctx = context.Background()
 
 func InitRedis() {

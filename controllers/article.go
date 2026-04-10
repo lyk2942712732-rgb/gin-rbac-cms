@@ -147,7 +147,7 @@ func GetArticleDetail(c *gin.Context) {
 	// 4. 【第三步】查到之后，把它序列化成 JSON，存回 Redis 接待台，方便下一个人查！
 	articleJSON, _ := json.Marshal(article)
 	// 设置 1 小时过期时间 (热点数据缓存策略)
-	models.RDB.Set(models.Ctx, cacheKey, articleJSON, time.Hour)
+	models.RDB.Set(models.Ctx, cacheKey, articleJSON, time.Hour) //context,key,value,expiration
 
 	// 5. 返回给前端
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功(来自数据库)", "data": article})
