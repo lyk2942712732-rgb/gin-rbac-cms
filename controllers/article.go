@@ -1,11 +1,14 @@
 package controllers
 
 import (
+	"encoding/json"
 	"myapp/models"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 type CreateArticleRequest struct {
@@ -111,18 +114,43 @@ func GetArticles(c *gin.Context) {
 // @Param id path int true "文章ID"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/articles/{id} [get]
+// GetArticleDetail 获取单篇文章详情 (带 Redis 缓存)
 func GetArticleDetail(c *gin.Context) {
 	id := c.Param("id")
 
-	//根据id查询文章同时加载作者信息
+	// 1. 定义缓存的 Key，比如 "article:1"
+	cacheKey := "article:" + id
+
+	// 2. 【第一步】先去 Redis 接待台找数据
+	val, err := models.RDB.Get(models.Ctx, cacheKey).Result()
+	if err == nil {
+		// 命中缓存！直接把 Redis 里的 JSON 字符串返回给前端
+		// 这一步因为不查 MySQL，速度极快 (通常在 1 毫秒以内)
+		var article models.Article
+		json.Unmarshal([]byte(val), &article)
+
+		c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功(来自缓存)", "data": article})
+		return
+	} else if err != redis.Nil {
+		// 如果不是“数据不存在”的错误，而是 Redis 挂了，记录日志（这里简写）
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "缓存服务异常"})
+		return
+	}
+
+	// 3. 【第二步】如果 Redis 里没有 (缓存未命中)，老老实实去 MySQL 档案室查
 	var article models.Article
 	if err := models.DB.Preload("User").First(&article, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章未找到"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功", "article": article})
+	// 4. 【第三步】查到之后，把它序列化成 JSON，存回 Redis 接待台，方便下一个人查！
+	articleJSON, _ := json.Marshal(article)
+	// 设置 1 小时过期时间 (热点数据缓存策略)
+	models.RDB.Set(models.Ctx, cacheKey, articleJSON, time.Hour)
 
+	// 5. 返回给前端
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功(来自数据库)", "data": article})
 }
 
 // UpdateArticle 更新文章

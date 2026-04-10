@@ -14,19 +14,26 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # 2. 我们的 Go 业务服务
+# 新增 Redis 服务
+  redis:
+    image: redis:7.0-alpine
+    container_name: my_redis
+    ports:
+      - "6379:6379"
+
   app:
-    build: .             # 告诉 compose 去当前目录找 Dockerfile 现场编译
+    build: .             
     container_name: my_go_app
     ports:
       - "8080:8080"
     environment:
-      # 【核心魔法】：注意这里的 tcp(mysql:3306)！
-      # 在 Docker 内部网络里，容器之间可以直接通过服务名（mysql）互相访问，不需要写 IP！
       - DSN=root:rootpassword123@tcp(mysql:3306)/my_gin_db?charset=utf8mb4&parseTime=True&loc=Local
+      # 2. 给 Go 程序传入 Redis 的内部网络地址
+      - REDIS_ADDR=redis:6379 
     depends_on:
-      - mysql            # 确保 mysql 先启动
-    restart: always      # 如果数据库没准备好导致程序崩溃，它会自动重启重试
+      - mysql
+      - redis            # 3. 确保 redis 也先启动
+    restart: always
 
 volumes:
   mysql_data:
