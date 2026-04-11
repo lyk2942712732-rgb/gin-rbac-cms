@@ -20,6 +20,9 @@ func main() {
 	// 1. 初始化数据库
 	models.InitDB()
 	models.InitRedis() // 新增这一行，启动 Redis
+	// 【新增这一行】：系统启动时自动填充初始数据
+	models.InitSeedData()
+
 	// 2. 注册 Gin 路由，r直接可以POST和GET
 	r := gin.Default()
 

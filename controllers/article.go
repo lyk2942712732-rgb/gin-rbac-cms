@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"myapp/models"
 	"net/http"
 	"strconv"
@@ -121,30 +122,30 @@ func GetArticleDetail(c *gin.Context) {
 	// 1. 定义缓存的 Key，比如 "article:1"
 	cacheKey := "article:" + id
 
-	// 2. 【第一步】先去 Redis 接待台找数据
+	// 2. 【第一步】先去 Redis找数据
 	val, err := models.RDB.Get(models.Ctx, cacheKey).Result()
 	if err == nil {
-		// 命中缓存！直接把 Redis 里的 JSON 字符串返回给前端
-		// 这一步因为不查 MySQL，速度极快 (通常在 1 毫秒以内)
+		// 命中缓存,直接把 Redis 里的 JSON 字符串返回给前端
+
 		var article models.Article
-		json.Unmarshal([]byte(val), &article)
+		json.Unmarshal([]byte(val), &article) //反序列化后结果给 article 变量
 
 		c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功(来自缓存)", "data": article})
 		return
 	} else if err != redis.Nil {
-		// 如果不是“数据不存在”的错误，而是 Redis 挂了，记录日志（这里简写）
+		// Redis 挂了或者发生了其他错误，除了缓存未命中以外的错误
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "缓存服务异常"})
 		return
 	}
 
-	// 3. 【第二步】如果 Redis 里没有 (缓存未命中)，老老实实去 MySQL 档案室查
+	// 3. 【第二步】如果 Redis 里没有 (缓存未命中)，去 MySQL 查
 	var article models.Article
 	if err := models.DB.Preload("User").First(&article, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章未找到"})
 		return
 	}
 
-	// 4. 【第三步】查到之后，把它序列化成 JSON，存回 Redis 接待台，方便下一个人查！
+	// 4. 【第三步】查到之后，把它序列化成 JSON，存到Redis，方便下一个人查
 	articleJSON, _ := json.Marshal(article)
 	// 设置 1 小时过期时间 (热点数据缓存策略)
 	models.RDB.Set(models.Ctx, cacheKey, articleJSON, time.Hour) //context,key,value,expiration
@@ -153,44 +154,60 @@ func GetArticleDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功(来自数据库)", "data": article})
 }
 
-// UpdateArticle 更新文章
+// UpdateArticle 更新文章 (解决缓存一致性)
 // @Summary 更新文章
-// @Description 根据文章 ID 更新文章标题和内容
+// @Description 更新指定 ID 的文章，并自动清除 Redis 脏缓存
 // @Tags 文章模块
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "文章ID"
-// @Param data body UpdateArticleRequest true "更新内容"
+// @Security ApiKeyAuth
+// @Param id path int true "文章 ID"
+// @Param data body struct{Title string `json:"title" binding:"required"`; Content string `json:"content" binding:"required"`} true "更新内容"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/articles/{id} [put]
 func UpdateArticle(c *gin.Context) {
 	id := c.Param("id")
 
-	var input UpdateArticleRequest
+	// 1. 校验数据格式
+	var req UpdateArticleRequest
 
-	if err := c.ShouldBindJSON(&input); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "参数错误"})
 		return
 	}
 
-	// 根据 ID 查询文章
+	// 2. 核心原则第一步：先更新 MySQL 数据库
 	var article models.Article
 	if err := models.DB.First(&article, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章未找到"})
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章不存在"})
 		return
 	}
 
-	//权限检查通过后修改文章信息
-	article.Title = input.Title
-	article.Content = input.Content
-
-	//保存修改后的文章信息到数据库
-	if err := models.DB.Save(&article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "更新失败"})
+	// 【安全防线】：防水平越权 (IDOR) - 确保当前登录的人是这篇文章的作者
+	userID, _ := c.Get("userID")
+	if article.UserID != userID.(uint) {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "msg": "越权操作：您只能修改自己的文章"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "更新成功"})
+
+	// 执行数据库更新
+	models.DB.Model(&article).Updates(models.Article{
+		Title:   req.Title,
+		Content: req.Content,
+	})
+
+	// 3. 核心原则第二步：删除 Redis 里的旧缓存！
+	// 拼接对应的 Cache Key
+	cacheKey := "article:" + id
+	err := models.RDB.Del(models.Ctx, cacheKey).Err()
+	if err != nil {
+		// 注意：真实生产环境中，如果删除缓存失败，通常会接入消息队列重试，
+		// 这里为了简单，我们先记录日志（打印）
+		fmt.Printf("警告: 删除缓存失败 %s: %v\n", cacheKey, err)
+	}
+
+	// 4. 返回成功
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "更新成功，缓存已刷新", "data": article})
 }
 
 // DeleteArticle 删除文章

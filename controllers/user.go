@@ -44,17 +44,28 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
 		return
 	}
-
+	//初始化角色
 	user := models.User{Username: input.Username, Password: string(hashedPassword)}
-	// DB 是一个全局的数据库连接实例，已经在 models 包中初始化并连接到数据库。
-	// 通过 models.DB，我们可以执行数据库操作，例如创建、查询、更新和删除记录。
-	// 在这里，我们使用 models.DB.Create(&user) 来将新创建的用户记录保存到数据库中。
+
+	// 这里我们假设新注册的用户默认都是 "editor" (内容编辑) 角色
+	var defaultRole models.Role
+	// 去角色表里找 keyword 为 "editor" 的角色
+	if err := models.DB.Where("keyword = ?", "editor").First(&defaultRole).Error; err == nil {
+		// 如果找到了，就把这个角色分配给用户
+		// GORM 在接下来 Create 的时候，会自动把这个关联写入到 user_roles 中间表里
+		user.Roles = []models.Role{defaultRole}
+	} else {
+		// 严谨起见：如果连默认角色都没查到，可能数据库还没初始化
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "系统默认角色缺失，请联系管理员"})
+		return
+	}
+
 	if err := models.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名已存在或创建失败"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "注册成功"})
+	c.JSON(http.StatusOK, gin.H{"message": "注册成功，已自动分配基础权限"})
 }
 
 // Login 账号登录
