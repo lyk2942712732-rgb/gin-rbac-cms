@@ -24,7 +24,7 @@ type ArticleRequest struct {
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
-// @Param data body CreateArticleRequest true "文章内容"
+// @Param data body ArticleRequest true "文章内容"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/articles [post]
 func CreateArticle(c *gin.Context) {
@@ -157,7 +157,7 @@ func GetArticleDetail(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param id path int true "文章 ID"
-// @Param data body UpdateArticleRequest true "更新内容"
+// @Param data body ArticleRequest true "更新内容"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/articles/{id} [put]
 func UpdateArticle(c *gin.Context) {
