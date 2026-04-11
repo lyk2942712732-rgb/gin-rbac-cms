@@ -51,4 +51,5 @@ jobs:
             git pull origin main
             
             # 2. 重新编译并重启 Docker 容器 (平滑重启)
-            docker-compose up -d --build
+            docker compose up -d --build
+            #docker具体命令根据公网服务器而定,这里是阿里云服务器
