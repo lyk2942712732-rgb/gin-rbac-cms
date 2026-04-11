@@ -12,14 +12,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type CreateArticleRequest struct {
+type ArticleRequest struct {
 	Title   string `json:"title" binding:"required"`
 	Content string `json:"content" binding:"required"`
-}
-
-type UpdateArticleRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
 }
 
 // CreateArticle 发布文章
@@ -33,7 +28,7 @@ type UpdateArticleRequest struct {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/articles [post]
 func CreateArticle(c *gin.Context) {
-	var input CreateArticleRequest
+	var input ArticleRequest
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "参数错误"})
 		return
@@ -169,7 +164,7 @@ func UpdateArticle(c *gin.Context) {
 	id := c.Param("id")
 
 	// 1. 校验数据格式
-	var req UpdateArticleRequest
+	var req ArticleRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "参数错误"})
