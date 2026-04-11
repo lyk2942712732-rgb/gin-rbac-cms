@@ -162,7 +162,7 @@ func GetArticleDetail(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param id path int true "文章 ID"
-// @Param data body struct{Title string `json:"title" binding:"required"`; Content string `json:"content" binding:"required"`} true "更新内容"
+// @Param data body UpdateArticleRequest true "更新内容"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/articles/{id} [put]
 func UpdateArticle(c *gin.Context) {
