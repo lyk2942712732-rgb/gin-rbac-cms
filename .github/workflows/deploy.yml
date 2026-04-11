@@ -10,6 +10,7 @@ jobs:
   # 任务一：CI (持续集成) - 自动测试与编译检查
   build-and-test:
     runs-on: ubuntu-latest
+    #这个Ubuntu是GitHub的机器，用于CI和CD
     steps:
       - name: 📥 拉取最新代码
         uses: actions/checkout@v3
