@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (私有化版)
+name: CI/CD Pipeline (完整企业私有版)
 
 on:
   push:
@@ -6,18 +6,36 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
-    # 核心魔法：告诉 GitHub，不要用你的公网机器，用我刚刚注册的这台名叫 self-hosted 的特工！
+  build-test-and-deploy:
     runs-on: self-hosted 
     
     steps:
-      - name: 📥 拉取最新代码
+      # ==========================================
+      # 🛡️ CI 阶段：持续集成 (安检门)
+      # ==========================================
+      - name: 📥 1. 拉取最新代码
         uses: actions/checkout@v3
 
-      - name: 🚀 编译并平滑重启服务
+      - name: 🐹 2. 配置 Go 编译环境
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.26' # 保持与你项目一致
+
+      - name: 📦 3. 下载依赖与编译检查 (核心防线)
         run: |
-          # 因为是 self-hosted，这个脚本其实是直接在你的阿里云服务器的 /home/github-runner/actions-runner/_work/... 目录下执行的！
-          # 我们只需要直接敲 docker 命令就行了，没有任何密码泄露的风险！
-          
-          # 1. 确保服务器的 docker 镜像能顺利编译并后台运行
+          go mod tidy
+          # 尝试编译整个项目，如果有语法错误，流水线会在这里亮红灯并直接终止，绝不会执行后续部署！
+          go build -v ./...
+        
+      - name: 📝 4. 自动生成最新 Swagger 接口文档
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@latest
+          $(go env GOPATH)/bin/swag init
+
+      # ==========================================
+      # 🚀 CD 阶段：持续部署 (上线)
+      # ==========================================
+      - name: 🚢 5. 构建 Docker 镜像并平滑重启服务
+        # 只有上面的 1~4 步全部绿灯通过，才会执行这一步
+        run: |
           docker compose up -d --build
