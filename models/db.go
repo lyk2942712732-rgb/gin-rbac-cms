@@ -1,7 +1,7 @@
 package models
 
 import (
-	"fmt"
+	"myapp/utils"
 	"os"
 
 	"gorm.io/driver/mysql"
@@ -25,7 +25,8 @@ func InitDB() {
 		panic("连接数据库失败: " + err.Error())
 	}
 
-	fmt.Println("数据库连接成功，正在自动同步表结构...")
+	utils.Logger.Info("✅ 数据库连接成功！正在自动迁移表结构...")
+
 	DB.AutoMigrate(&User{}, &Article{}, &Role{}, &Permission{})
 	// GORM 扫描到 many2many 标签时，会自动在数据库里建出 user_roles 和 role_permissions 这两张中间表！
 	// AutoMigrate 方法会根据 User 结构体自动创建或更新数据库表结构，确保数据库中的表与代码中的模型保持一致。

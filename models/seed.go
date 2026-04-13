@@ -1,7 +1,7 @@
 package models
 
 import (
-	"fmt"
+	"myapp/utils"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,7 +16,7 @@ func InitSeedData() {
 		return
 	}
 
-	fmt.Println("🌱 检测到全新数据库，正在进行数据播种 (Data Seeding)...")
+	utils.Logger.Info("🚀 系统第一次启动，正在播种初始数据...")
 
 	// 1. 创建基础权限 (严格对应 rbac.go 里的 perm.Code)
 	pCreate := Permission{Name: "发布文章", Code: "article:create"}
@@ -58,7 +58,5 @@ func InitSeedData() {
 	DB.Create(&adminUser)
 	DB.Create(&editorUser)
 
-	fmt.Println("✅ 数据播种完美搞定！")
-	fmt.Println("👉 账号1: admin / 密码: 123456 (畅通无阻)")
-	fmt.Println("👉 账号2: editor / 密码: 123456 (测试 article:delete 会被拦截)")
+	utils.Logger.Info("✅ 初始数据播种完成！默认账号: admin/123456 (超级管理员), editor/123456 (内容编辑)")
 }

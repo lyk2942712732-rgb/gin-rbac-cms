@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"myapp/models"
 	"net/http"
 	"strconv"
@@ -10,6 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+
+	"myapp/utils" // 引入日志工具包 (注意替换为你的真实模块名)
+
+	"go.uber.org/zap" // 引入 zap 核心包
 )
 
 type ArticleRequest struct {
@@ -32,6 +35,7 @@ func CreateArticle(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "参数错误"})
 		return
+
 	}
 
 	// 从 JWT 中间件存入的上下文中获取当前登录的 UserID
@@ -44,9 +48,11 @@ func CreateArticle(c *gin.Context) {
 	}
 
 	if err := models.DB.Create(&article).Error; err != nil {
+		utils.Logger.Error("发布文章失败，写入数据库异常", zap.Uint("userID", uid.(uint)), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "发布失败"})
 		return
 	}
+	utils.Logger.Info("新文章发布成功", zap.Uint("userID", uid.(uint)), zap.Uint("articleID", article.ID))
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "发布成功"})
 }
 
@@ -88,7 +94,12 @@ func GetArticles(c *gin.Context) {
 	// 5. 执行分页查询
 	// Offset: 跳过多少条数据，Limit: 限制返回多少条，达到分页效果。
 	offset := (page - 1) * pageSize
-	query.Offset(offset).Limit(pageSize).Preload("User").Find(&articles)
+	if err := query.Offset(offset).Limit(pageSize).Preload("User").Find(&articles).Error; err != nil {
+		utils.Logger.Error("获取文章列表失败", zap.Error(err))
+
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "查询失败"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 200,
@@ -120,8 +131,8 @@ func GetArticleDetail(c *gin.Context) {
 	// 2. 【第一步】先去 Redis找数据
 	val, err := models.RDB.Get(models.Ctx, cacheKey).Result()
 	if err == nil {
-		// 命中缓存,直接把 Redis 里的 JSON 字符串返回给前端
 
+		// 命中缓存,直接把 Redis 里的 JSON 字符串返回给前端
 		var article models.Article
 		json.Unmarshal([]byte(val), &article) //反序列化后结果给 article 变量
 
@@ -129,6 +140,8 @@ func GetArticleDetail(c *gin.Context) {
 		return
 	} else if err != redis.Nil {
 		// Redis 挂了或者发生了其他错误，除了缓存未命中以外的错误
+
+		utils.Logger.Error("获取文章详情：Redis服务异常", zap.String("cacheKey", cacheKey), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "缓存服务异常"})
 		return
 	}
@@ -136,6 +149,7 @@ func GetArticleDetail(c *gin.Context) {
 	// 3. 【第二步】如果 Redis 里没有 (缓存未命中)，去 MySQL 查
 	var article models.Article
 	if err := models.DB.Preload("User").First(&article, id).Error; err != nil {
+		utils.Logger.Warn("获取文章详情：文章未找到", zap.String("articleID", id))
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章未找到"})
 		return
 	}
@@ -174,6 +188,7 @@ func UpdateArticle(c *gin.Context) {
 	// 2. 核心原则第一步：先更新 MySQL 数据库
 	var article models.Article
 	if err := models.DB.First(&article, id).Error; err != nil {
+
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章不存在"})
 		return
 	}
@@ -181,25 +196,33 @@ func UpdateArticle(c *gin.Context) {
 	// 【安全防线】：防水平越权 (IDOR) - 确保当前登录的人是这篇文章的作者
 	userID, _ := c.Get("userID")
 	if article.UserID != userID.(uint) {
+		//记录越权操作尝试的日志
+		utils.Logger.Warn("越权操作尝试", zap.Uint("userID", userID.(uint)), zap.Uint("articleUserID", article.UserID), zap.String("articleID", id))
 		c.JSON(http.StatusForbidden, gin.H{"code": 403, "msg": "越权操作：您只能修改自己的文章"})
 		return
 	}
 
 	// 执行数据库更新
-	models.DB.Model(&article).Updates(models.Article{
+	if err := models.DB.Model(&article).Updates(models.Article{
 		Title:   req.Title,
 		Content: req.Content,
-	})
+	}).Error; err != nil {
+		utils.Logger.Error("更新文章失败:数据库异常", zap.String("articleID", id), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "更新失败"})
+		return
+	}
 
-	// 3. 核心原则第二步：删除 Redis 里的旧缓存！
+	// 删除 Redis 里的旧缓存
 	// 拼接对应的 Cache Key
 	cacheKey := "article:" + id
 	err := models.RDB.Del(models.Ctx, cacheKey).Err()
 	if err != nil {
-		// 注意：真实生产环境中，如果删除缓存失败，通常会接入消息队列重试，
-		// 这里为了简单，我们先记录日志（打印）
-		fmt.Printf("警告: 删除缓存失败 %s: %v\n", cacheKey, err)
+		// 缓存删除失败极其严重，会导致全网用户看到旧数据（脏数据风险）,需要日志记录
+		utils.Logger.Error("删除缓存失败", zap.String("cacheKey", cacheKey), zap.Error(err))
 	}
+
+	// 记录缓存刷新成功
+	utils.Logger.Info("文章更新成功，相关缓存已清理", zap.String("cacheKey", cacheKey))
 
 	// 4. 返回成功
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "更新成功，缓存已刷新", "data": article})
@@ -227,8 +250,18 @@ func DeleteArticle(c *gin.Context) {
 
 	//权限检查通过后删除文章
 	if err := models.DB.Delete(&models.Article{}, id).Error; err != nil {
+		utils.Logger.Error("删除文章失败，数据库异常", zap.String("articleID", id), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "删除失败"})
 		return
 	}
+
+	// 删除成功后，清理缓存
+	cacheKey := "article:" + id
+	err := models.RDB.Del(models.Ctx, cacheKey).Err()
+	if err != nil {
+		utils.Logger.Error("删除缓存失败", zap.String("cacheKey", cacheKey), zap.Error(err))
+	}
+
+	utils.Logger.Info("文章删除成功", zap.String("articleID", id))
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "删除成功"})
 }

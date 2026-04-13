@@ -2,7 +2,7 @@ package models
 
 import (
 	"context"
-	"fmt"
+	"myapp/utils"
 	"os"
 
 	"github.com/redis/go-redis/v9"
@@ -31,5 +31,5 @@ func InitRedis() {
 	if err != nil {
 		panic("连接 Redis 失败: " + err.Error())
 	}
-	fmt.Println("Redis 缓存引擎初始化成功！")
+	utils.Logger.Info("✅ Redis 连接成功！")
 }

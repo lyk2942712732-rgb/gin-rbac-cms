@@ -8,6 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+
+	"myapp/utils" // 引入日志工具包 (注意替换为你的真实模块名)
+
+	"go.uber.org/zap" // 引入 zap 核心包
 )
 
 type RegisterRequest struct {
@@ -61,9 +65,13 @@ func Register(c *gin.Context) {
 	}
 
 	if err := models.DB.Create(&user).Error; err != nil {
+		utils.Logger.Error("注册失败:用户名已存在或写入失败", zap.String("username", user.Username), zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名已存在或创建失败"})
 		return
 	}
+
+	// 【常规情报】：记录新用户
+	utils.Logger.Info("新用户注册成功", zap.String("username", user.Username))
 
 	c.JSON(http.StatusOK, gin.H{"message": "注册成功，已自动分配基础权限"})
 }
@@ -89,11 +97,14 @@ func Login(c *gin.Context) {
 	// 这里我们查询 username 字段等于 input.Username 的记录。First 方法用于将第一个结果加载到 user 变量中。
 	// 如果查询失败（例如没有找到匹配的记录），它会返回一个错误。
 	if err := models.DB.Where("username = ?", input.Username).First(&user).Error; err != nil {
+		utils.Logger.Warn("登录失败：用户不存在", zap.String("attempt_username", input.Username))
+		//记录不存在的用户名尝试登录
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户不存在"})
 		return
 	}
 	//这里查询成功了,刚才定义的user实例被成功填充了数据库中的用户数据,接下来我们需要验证用户输入的密码是否正确。
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
+		utils.Logger.Warn("登录失败：密码错误", zap.String("attempt_username", input.Username))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "密码错误"})
 		return
 	}
@@ -101,9 +112,12 @@ func Login(c *gin.Context) {
 	// 调用 middlewares 包里的生成 Token 方法
 	token, err := middlewares.GenerateToken(user.ID)
 	if err != nil {
+		utils.Logger.Error("生成 Token 失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成 Token 失败"})
 		return
 	}
+
+	utils.Logger.Info("用户登录成功", zap.String("username", user.Username), zap.Uint("userID", user.ID))
 
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }

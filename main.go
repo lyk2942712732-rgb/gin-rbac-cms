@@ -5,6 +5,8 @@ import (
 	"myapp/middlewares" // 替换为你的模块名
 	"myapp/models"      // 替换为你的模块名
 
+	"myapp/utils"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +19,12 @@ import (
 // @in header
 // @name Authorization
 func main() {
+
+	// 0. 初始化全局日志黑匣子
+	utils.InitLogger()
+	// 确保在程序退出前把缓存里的日志刷入磁盘
+	defer utils.Logger.Sync()
+
 	// 1. 初始化数据库
 	models.InitDB()
 	models.InitRedis() // 新增这一行，启动 Redis
