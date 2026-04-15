@@ -33,7 +33,7 @@ jobs:
       - name: 🔑 5. 登录阿里云容器镜像服务 (ACR)
         uses: docker/login-action@v2
         with:
-          registry: registry.cn-hangzhou.aliyuncs.com  # 请替换为你的实际地域节点
+          registry: ${{ secrets.ACR_REGISTRY }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
@@ -43,7 +43,7 @@ jobs:
           context: .
           push: true
           # 格式: registry.<地域>.aliyuncs.com/<命名空间>/<仓库名>:latest
-          tags: registry.cn-hangzhou.aliyuncs.com/my-company-apps/backend-api:latest
+          tags:   ${{ secrets.ACR_REGISTRY }}/my-company-apps/backend-api:latest
 
   # ==========================================
   # 🚀 第二阶段：通知服务器拉取最新镜像并重启
@@ -60,7 +60,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             # 1. 登录私有镜像库 (确保服务器有权限拉取)
-            docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} registry.cn-hangzhou.aliyuncs.com
+            docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} ${{ secrets.ACR_REGISTRY }}
             
             cd /path/to/your/project
             # 2. 仅更新编排文件 (不需要在服务器上编译源码了)
