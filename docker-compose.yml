@@ -9,8 +9,9 @@ services:
       MYSQL_ROOT_PASSWORD: rootpassword123 # 设置 MySQL 的 root 密码
       MYSQL_DATABASE: my_gin_db # 启动时自动建好这个空库
     ports:
-      - "3306:3306"
-    # 将数据挂载到本地，防止容器重启后数据丢失
+      - "3307:3306"
+      #使用3307防止与宿主机端口冲突
+      # 将数据挂载到本地，防止容器重启后数据丢失
     volumes:
       - mysql_data:/var/lib/mysql
 
