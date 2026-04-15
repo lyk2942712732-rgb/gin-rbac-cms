@@ -1,53 +1,74 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline (构建与部署解耦版)
 
-# 触发条件：当代码推送到 main 分支时触发
 on:
   push:
     branches:
       - main
 
 jobs:
-  # 任务一：CI (持续集成) - 自动测试与编译检查
-  build-and-test:
+  # ==========================================
+  # 🏭 第一阶段：在 GitHub 上编译并打包镜像
+  # ==========================================
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 拉取最新代码
+      - name: 📥 1. 拉取最新代码
         uses: actions/checkout@v3
 
-      - name: 🐹 设置 Go 环境
+      - name: 🐹 2. 配置 Go 编译环境
         uses: actions/setup-go@v4
         with:
-          go-version: '1.26' # 保持和你的项目版本一致
+          go-version: '1.26'
 
-      - name: 📦 下载依赖
-        run: go mod tidy
-
-      - name: 🔨 尝试编译打包 (检查语法错误)
-        run: go build -v ./...
+      - name: 📦 3. 编译检查 (防线)
+        run: |
+          go mod tidy
+          go build -v ./...
         
-      - name: 📝 自动生成 Swagger 文档 (确保文档最新)
+      - name: 📝 4. 自动生成 Swagger 接口文档
         run: |
           go install github.com/swaggo/swag/cmd/swag@latest
-          swag init
+          $(go env GOPATH)/bin/swag init
 
-  # 任务二：CD (持续部署) - 自动推送到服务器并运行
-  # 注意：这个任务需要你有自己的云服务器，并且配置了 GitHub Secrets
-  deploy-to-server:
-    needs: build-and-test # 必须等上面的编译检查通过后，才执行部署
+      - name: 🔑 5. 登录阿里云容器镜像服务 (ACR)
+        uses: docker/login-action@v2
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com  # 请替换为你的实际地域节点
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: 🐳 6. 构建并推送 Docker 镜像 (利用 GitHub 极速网络)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          # 格式: registry.<地域>.aliyuncs.com/<命名空间>/<仓库名>:latest
+          tags: registry.cn-hangzhou.aliyuncs.com/my-company-apps/backend-api:latest
+
+  # ==========================================
+  # 🚀 第二阶段：通知服务器拉取最新镜像并重启
+  # ==========================================
+  deploy:
+    needs: build-and-push  # 确保只有第一阶段成功，才会执行部署
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 登录服务器并自动部署
-        uses: appleboy/ssh-action@master
+      - name: 🚢 7. 登录服务器并自动部署
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SERVER_HOST }}         # 你的服务器 IP
-          username: ${{ secrets.SERVER_USER }}     # 服务器登录名 (通常是 root)
-          password: ${{ secrets.SERVER_PASSWORD }} # 服务器密码
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # 假设你的代码放在服务器的 /www/gin-rbac-cms 目录下
-            cd /www/gin-rbac-cms
+            # 1. 登录私有镜像库 (确保服务器有权限拉取)
+            docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} registry.cn-hangzhou.aliyuncs.com
             
-            # 1. 拉取你刚才 push 到 GitHub 的最新代码
-            git pull origin main
+            cd /path/to/your/project
+            # 2. 仅更新编排文件 (不需要在服务器上编译源码了)
+            git pull origin main 
             
-            # 2. 重新编译并重启 Docker 容器 (平滑重启)
-            docker-compose up -d --build
+            # 3. 强制拉取最新镜像并平滑重启服务 (去掉了 --build 参数)
+            docker compose pull
+            docker compose up -d
+            
+            # 4. (可选) 清理悬空的旧镜像，防止挤爆服务器硬盘
+            docker image prune -f

@@ -6,15 +6,15 @@ services:
     image: mysql:8.0
     container_name: my_mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword123  # 设置 MySQL 的 root 密码
-      MYSQL_DATABASE: my_gin_db             # 启动时自动建好这个空库
+      MYSQL_ROOT_PASSWORD: rootpassword123 # 设置 MySQL 的 root 密码
+      MYSQL_DATABASE: my_gin_db # 启动时自动建好这个空库
     ports:
       - "3306:3306"
     # 将数据挂载到本地，防止容器重启后数据丢失
     volumes:
       - mysql_data:/var/lib/mysql
 
-# 新增 Redis 服务
+  # 新增 Redis 服务
   redis:
     image: redis:7.0-alpine
     container_name: my_redis
@@ -22,17 +22,19 @@ services:
       - "6379:6379"
 
   app:
-    build: .             
+    # ⚠️ 核心修改点：删除了原本的 build: . 
+    # 替换为在 GitHub Actions 中打包并推送到阿里云 ACR 的目标镜像地址
+    image: registry.cn-hangzhou.aliyuncs.com/my-company-apps/backend-api:latest
     container_name: my_go_app
     ports:
       - "8080:8080"
     environment:
       - DSN=root:rootpassword123@tcp(mysql:3306)/my_gin_db?charset=utf8mb4&parseTime=True&loc=Local
       # 2. 给 Go 程序传入 Redis 的内部网络地址
-      - REDIS_ADDR=redis:6379 
+      - REDIS_ADDR=redis:6379
     depends_on:
       - mysql
-      - redis            # 3. 确保 redis 也先启动
+      - redis # 3. 确保 redis 也先启动
     restart: always
 
 volumes:
