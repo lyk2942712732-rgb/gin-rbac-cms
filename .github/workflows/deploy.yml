@@ -62,7 +62,7 @@ jobs:
             # 1. 登录私有镜像库 (确保服务器有权限拉取)
             docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} ${{ secrets.ACR_REGISTRY }}
             
-            cd /path/to/your/project
+            cd /opt/gin-rbac-cms
             # 2. 仅更新编排文件 (不需要在服务器上编译源码了)
             git pull origin main 
             
