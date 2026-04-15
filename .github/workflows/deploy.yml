@@ -1,42 +1,53 @@
-name: CI/CD Pipeline (完整企业私有版)
+name: CI/CD Pipeline
 
+# 触发条件：当代码推送到 main 分支时触发
 on:
   push:
     branches:
       - main
 
 jobs:
-  build-test-and-deploy:
+  # 任务一：CI (持续集成) - 自动测试与编译检查
+  build-and-test:
     runs-on: ubuntu-latest
-
-    
     steps:
-      # ==========================================
-      # 🛡️ CI 阶段：持续集成 (安检门)
-      # ==========================================
-      - name: 📥 1. 拉取最新代码
+      - name: 📥 拉取最新代码
         uses: actions/checkout@v3
 
-      - name: 🐹 2. 配置 Go 编译环境
+      - name: 🐹 设置 Go 环境
         uses: actions/setup-go@v4
         with:
-          go-version: '1.26' # 保持与你项目一致
+          go-version: '1.26' # 保持和你的项目版本一致
 
-      - name: 📦 3. 下载依赖与编译检查 (核心防线)
-        run: |
-          go mod tidy
-          # 尝试编译整个项目，如果有语法错误，流水线会在这里亮红灯并直接终止，绝不会执行后续部署！
-          go build -v ./...
+      - name: 📦 下载依赖
+        run: go mod tidy
+
+      - name: 🔨 尝试编译打包 (检查语法错误)
+        run: go build -v ./...
         
-      - name: 📝 4. 自动生成最新 Swagger 接口文档
+      - name: 📝 自动生成 Swagger 文档 (确保文档最新)
         run: |
           go install github.com/swaggo/swag/cmd/swag@latest
-          $(go env GOPATH)/bin/swag init
+          swag init
 
-      # ==========================================
-      # 🚀 CD 阶段：持续部署 (上线)
-      # ==========================================
-      - name: 🚢 5. 构建 Docker 镜像并平滑重启服务
-        # 只有上面的 1~4 步全部绿灯通过，才会执行这一步
-        run: |
-          docker compose up -d --build
+  # 任务二：CD (持续部署) - 自动推送到服务器并运行
+  # 注意：这个任务需要你有自己的云服务器，并且配置了 GitHub Secrets
+  deploy-to-server:
+    needs: build-and-test # 必须等上面的编译检查通过后，才执行部署
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 登录服务器并自动部署
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}         # 你的服务器 IP
+          username: ${{ secrets.SERVER_USER }}     # 服务器登录名 (通常是 root)
+          password: ${{ secrets.SERVER_PASSWORD }} # 服务器密码
+          script: |
+            # 假设你的代码放在服务器的 /www/gin-rbac-cms 目录下
+            cd /www/gin-rbac-cms
+            
+            # 1. 拉取你刚才 push 到 GitHub 的最新代码
+            git pull origin main
+            
+            # 2. 重新编译并重启 Docker 容器 (平滑重启)
+            docker-compose up -d --build

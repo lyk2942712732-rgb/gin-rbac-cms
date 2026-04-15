@@ -139,8 +139,8 @@ func GetArticleDetail(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "查询成功(来自缓存)", "data": article})
 		return
 	} else if err != redis.Nil {
-		// Redis 挂了或者发生了其他错误，除了缓存未命中以外的错误
 
+		// Redis 挂了或者发生了其他错误，除了缓存未命中以外的错误
 		utils.Logger.Error("获取文章详情：Redis服务异常", zap.String("cacheKey", cacheKey), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "缓存服务异常"})
 		return
@@ -188,7 +188,7 @@ func UpdateArticle(c *gin.Context) {
 	// 2. 核心原则第一步：先更新 MySQL 数据库
 	var article models.Article
 	if err := models.DB.First(&article, id).Error; err != nil {
-
+		utils.Logger.Warn("更新文章失败：文章未找到", zap.String("articleID", id))
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章不存在"})
 		return
 	}
@@ -244,6 +244,7 @@ func DeleteArticle(c *gin.Context) {
 	// 根据 ID 查询文章
 	var article models.Article
 	if err := models.DB.First(&article, id).Error; err != nil {
+		utils.Logger.Warn("删除文章失败：文章未找到", zap.String("articleID", id))
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "文章未找到"})
 		return
 	}

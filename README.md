@@ -1,61 +1,31 @@
-# 🚀 Gin-RBAC-CMS 企业级后台管理系统
+# 🚀 Gin-RBAC-CMS (企业级内容管理系统核心后端)
 
-![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go)
-![Gin Framework](https://img.shields.io/badge/Gin-1.9+-008ECF?style=for-the-badge&logo=go)
-![GORM](https://img.shields.io/badge/GORM-v1.25-red?style=for-the-badge)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)
+![Gin Framework](https://img.shields.io/badge/Gin-v1.9-00ADD8?style=flat)
+![Redis](https://img.shields.io/badge/Redis-v7.0-DC382D?style=flat&logo=redis)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-本项目是一个基于 Go 语言 (Gin + GORM) 开发的企业级内容管理系统 (CMS) 核心 API。项目主打**高安全性**与**云原生部署**，完整实现了基于角色的权限访问控制 (RBAC) 与无状态鉴权机制，适合作为中小型互联网企业后台业务的底层脚手架。
+## 📖 项目简介
+本项目是一个基于 Go (Gin) 编写的高性能、高可用的企业级 CMS 后端接口服务。项目严格遵循 RESTful API 设计规范，内置了完善的 RBAC 动态权限管理系统，并深度集成了 Redis 缓存架构与全自动 CI/CD 部署流水线，已达到真实线上生产环境的交付标准。
 
-## ✨ 核心特性 (Features)
+## ✨ 核心亮点 (Core Features)
+- **🔐 动态权限引擎 (RBAC)：** 基于 5 表关联的底层架构，结合 JWT 无状态鉴权，实现极其细粒度的接口级权限拦截，防范水平/垂直越权。
+- **⚡ 高并发缓存架构：** 引入 Redis 应对热点文章的高并发访问，严格落地 **Cache Aside (旁路缓存)** 策略，完美解决高并发下的数据一致性难题。
+- **📦 云原生与 DevOps：** 编写 Dockerfile 与 docker-compose.yml 实现环境一键隔离；基于 GitHub Actions 打通自动化构建与基于 Self-Hosted 的私有化服务器平滑部署。
+- **📡 极致可观测性：** 弃用原生 log，接入企业级高性能日志库 **Uber Zap** + Lumberjack，实现结构化 JSON 日志记录与自动化文件切割保留。
+- **📄 自动化接口文档：** 集成 Swaggo，利用代码注释实时生成并在线预览 API 文档。
 
-- **🔐 严密的权限控制 (RBAC)**：底层采用 5 张表实现角色与权限的精细化关联，通过全局中间件动态拦截越权访问。
-- **🛡️ 业务安全加固**：
-  - 采用 `Bcrypt` 算法进行密码哈希单向加密，防脱库撞库。
-  - 核心业务逻辑（如更新/删除文章）内置**防水平越权 (IDOR)** 校验，确保用户只能操作自身资源。
-  - 基于 `JWT` 的无状态身份认证。
-- **🐳 云原生友好**：采用 Docker 多阶段构建 (Multi-stage build)，极大压缩镜像体积，并提供 `docker-compose.yml` 实现“代码+环境”一键拉起。
-- **📖 优雅的代码工程**：采用标准的分层架构 (Models / Controllers / Middlewares)，代码高内聚低耦合。
+## 🛠️ 技术栈
+- **Web 框架：** Gin
+- **ORM 与 数据库：** GORM, MySQL 8.0
+- **缓存引擎：** Redis 7.0
+- **安全与密码学：** JWT (JSON Web Token), Bcrypt
+- **工程化组件：** Zap (日志), Swaggo (文档), Docker (容器), GitHub Actions (流水线)
 
-## 🛠️ 技术栈 (Tech Stack)
-
-- **Web 框架**: Gin
-- **ORM 框架**: GORM
-- **数据库**: MySQL 8.0
-- **鉴权组件**: golang-jwt/jwt/v5, x/crypto/bcrypt
-- **容器化部署**: Docker & Docker Compose
-
-## 📂 目录结构 (Structure)
-
-```text
-├── controllers/       # 业务逻辑控制层 (注册/登录/文章增删改查)
-├── middlewares/       # 全局中间件 (JWT 校验, RBAC 权限拦截)
-├── models/            # 数据库实体模型与 GORM 关联映射
-├── Dockerfile         # Docker 多阶段构建脚本
-├── docker-compose.yml # 容器编排文件
-├── main.go            # 服务入口与路由注册
-├── go.mod             # 依赖管理
-
-🚀 极速部署 (Quick Start)
-得益于容器化方案，您无需在本地安装 MySQL 和 Go 环境，仅需安装 Docker 即可一键启动整个微服务。
-
-# 1. 克隆项目
-git clone https://github.com/lyk2942712732-rgb/gin-rbac-cms.git
-cd gin-rbac-cms
-
-# 2. 一键编译并启动 (包含 MySQL 数据库与 Gin 服务)
-docker-compose up -d --build
-
-# 3. 检查服务运行状态
-docker-compose ps
-
-
-API 调试说明
-建议使用 Apifox 或 Postman 导入并调试以下核心链路：
-
-POST /api/register：注册账号
-
-POST /api/login：登录获取 JWT Token
-
-POST /api/articles：在 Headers 中携带 Token 发布文章
+## 🚀 极速启动
+1. 克隆本项目到本地 / 服务器。
+2. 确保本机已安装 Docker 与 Docker Compose。
+3. 在项目根目录执行：
+   ```bash
+   docker compose up -d --build
