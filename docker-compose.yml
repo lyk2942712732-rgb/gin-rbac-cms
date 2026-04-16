@@ -28,7 +28,7 @@ services:
     image: crpi-m2i1r0r0rzm991y5.cn-hangzhou.personal.cr.aliyuncs.com/my-company-apps/backend-api:latest
     container_name: my_go_app
     ports:
-      - "8081:8081"
+      - "8080:8080"
     environment:
       - DSN=root:rootpassword123@tcp(mysql:3306)/my_gin_db?charset=utf8mb4&parseTime=True&loc=Local
       # 2. 给 Go 程序传入 Redis 的内部网络地址
