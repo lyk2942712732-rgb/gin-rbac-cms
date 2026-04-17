@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"myapp/models"
 	"net/http"
 	"strconv"
@@ -76,6 +77,35 @@ func GetArticles(c *gin.Context) {
 
 	title := c.Query("title") // 搜索关键词
 
+	// ==================== 🚀 缓存拦截层 ====================
+	// 构造独一无二的 Cache Key，将所有查询条件包含进去
+	// 例如: "article:list:p:1:s:10:t:Go"
+	cacheKey := fmt.Sprintf("article:list:p:%d:s:%d:t:%s", page, pageSize, title)
+
+	// 去 Redis 查查看有没有
+	val, err := models.RDB.Get(models.Ctx, cacheKey).Result()
+	if err == nil {
+		// 缓存命中，把从 Redis 拿到的 JSON 字符串直接发给前端，完美避开 MySQL
+		// 注意：Redis 里存的是 map 的 JSON 字符串，需要原样吐出
+		//返回给客户端什么，就直接从 Redis 里存和拿什么，不要在这里解析成结构体再重新封装，避免不必要的性能损耗和潜在的序列化错误
+		var cacheData map[string]interface{}
+		json.Unmarshal([]byte(val), &cacheData)
+
+		c.JSON(http.StatusOK, gin.H{
+			"code": 200,
+			"msg":  "查询成功 (来自短效缓存)",
+			"data": cacheData,
+		})
+		return
+	} else if err != redis.Nil {
+
+		// Redis 挂了或者发生了其他错误，除了缓存未命中以外的错误
+		utils.Logger.Error("获取文章详情：Redis服务异常", zap.String("cacheKey", cacheKey), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "缓存服务异常"})
+		return
+	}
+	// ==================== 🚀 缓存拦截层结束 ====================
+
 	var articles []models.Article
 	var total int64
 
@@ -101,13 +131,22 @@ func GetArticles(c *gin.Context) {
 		return
 	}
 
+	responseData := map[string]interface{}{
+		"list":  articles,
+		"total": total,
+	}
+
+	// ==================== 📦 写入缓存层 ====================
+	// 将查到的数据转成 JSON，塞进 Redis
+	responseJSON, _ := json.Marshal(responseData)
+	// 核心：设置 60 秒的短 TTL！即使发生数据变更，最多容忍 60 秒的脏数据
+	models.RDB.Set(models.Ctx, cacheKey, responseJSON, 60*time.Second)
+	// ==================== 📦 写入缓存层结束 ====================
+
 	c.JSON(http.StatusOK, gin.H{
 		"code": 200,
 		"msg":  "查询成功",
-		"data": gin.H{
-			"list":  articles,
-			"total": total,
-		},
+		"data": responseData,
 	})
 }
 
